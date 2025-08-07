@@ -1,0 +1,182 @@
+// This is your Prisma schema file for Vercel deployment,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  mobile    String?  @unique
+  password  String
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  wallet      Wallet?
+  referrals   Referral[] @relation("Referrer")
+  referredBy  Referral? @relation("Referred")
+  transactions Transaction[]
+  userPlans   UserPlan[]
+  createdGifts Gift[] @relation("GiftCreator")
+  wonGifts    Gift[] @relation("GiftWinner")
+  
+  @@map("users")
+}
+
+model Wallet {
+  id       String @id @default(cuid())
+  balance  Float  @default(0)
+  bonus    Float  @default(0)
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("wallets")
+}
+
+model Transaction {
+  id        String           @id @default(cuid())
+  type      TransactionType
+  amount    Float
+  status    TransactionStatus @default(PENDING)
+  reference String?
+  upiId     String?
+  upiNumber String?
+  bonus     Float            @default(0)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  
+  @@map("transactions")
+}
+
+model Referral {
+  id          String @id @default(cuid())
+  code        String @unique
+  referrerId  String
+  referredId  String @unique
+  bonus       Float  @default(0)
+  status      ReferralStatus @default(PENDING)
+  referrer    User   @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred    User   @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("referrals")
+}
+
+model Plan {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  duration    Int        // in days
+  dailyReturn Float
+  isActive    Boolean    @default(true)
+  type        PlanType
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  userPlans   UserPlan[]
+  
+  @@map("plans")
+}
+
+model UserPlan {
+  id         String   @id @default(cuid())
+  userId     String
+  planId     String
+  status     PlanStatus @default(ACTIVE)
+  startDate  DateTime @default(now())
+  endDate    DateTime
+  totalEarned Float   @default(0)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan       Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, planId])
+  @@map("user_plans")
+}
+
+model Gift {
+  id        String     @id @default(cuid())
+  name      String
+  type      GiftType
+  value     Float
+  status    GiftStatus @default(ACTIVE)
+  winnerId  String?
+  winner    User?      @relation("GiftWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  userId    String
+  user      User       @relation("GiftCreator", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  
+  @@map("gifts")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  key       String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("admins")
+}
+
+enum TransactionType {
+  RECHARGE
+  WITHDRAWAL
+  BONUS
+  REFERRAL
+  PLAN_RETURN
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum PlanType {
+  LUCKY_DRAW
+  PASSION_INCOME
+  PREMIUM
+  BIG_BONANZA
+}
+
+enum PlanStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum GiftType {
+  LUCKY_DRAW
+  BONUS
+  CASHBACK
+}
+
+enum GiftStatus {
+  ACTIVE
+  CLAIMED
+  EXPIRED
+  CANCELLED
+}
