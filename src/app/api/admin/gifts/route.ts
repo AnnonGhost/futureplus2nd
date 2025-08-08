@@ -1,20 +1,12 @@
 import { NextResponse } from 'next/server'
 
-// Dynamic import to handle Vercel build-time issues
-async function getDb() {
-  try {
-    const { db } = await import('@/lib/db')
-    return db
-  } catch (error) {
-    console.error('Failed to import database client:', error)
-    return null
-  }
-}
-
+// Build-safe API route - completely avoids Prisma imports during build time
 export async function GET() {
   try {
-    // Check if we're in build phase
-    const isBuilding = process.env.NEXT_PHASE === 'phase-production-build'
+    // Check if we're in build phase or if Prisma is not available
+    const isBuilding = process.env.NEXT_PHASE === 'phase-production-build' || 
+                     process.env.VERCEL_ENV === 'production' && 
+                     !process.env.DATABASE_URL
     
     if (isBuilding) {
       // Return empty data during build phase
@@ -23,10 +15,14 @@ export async function GET() {
         message: 'Build phase - no database access'
       })
     }
-    
-    const db = await getDb()
-    
-    if (!db) {
+
+    // Dynamic import only when needed
+    let db
+    try {
+      const { db: prismaDb } = await import('@/lib/db')
+      db = prismaDb
+    } catch (error) {
+      console.error('Failed to import database client:', error)
       return NextResponse.json({
         gifts: [],
         error: 'Database not available'

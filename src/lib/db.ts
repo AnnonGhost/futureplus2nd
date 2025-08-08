@@ -1,10 +1,31 @@
 import { PrismaClient } from '@prisma/client'
 
-// Special handling for Vercel deployment
+// Global singleton to prevent multiple instances
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+// Create a build-safe Prisma client
 const createPrismaClient = () => {
-  // Check if we're in Vercel environment
+  // Check if we're in build phase
+  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
   const isVercel = process.env.VERCEL === '1' || process.env.NOW_REGION !== undefined
   
+  if (isBuildPhase) {
+    // During build phase, return a mock client that throws helpful errors
+    console.log('🔧 Build phase detected - using mock Prisma client')
+    return new Proxy({} as PrismaClient, {
+      get: (target, prop) => {
+        if (prop === '$connect' || prop === '$disconnect') {
+          return () => Promise.resolve()
+        }
+        return () => {
+          throw new Error(`Database access not available during build phase. Property: ${String(prop)}`)
+        }
+      }
+    })
+  }
+
   if (isVercel) {
     // Vercel-specific configuration
     console.log('🚀 Initializing Prisma client for Vercel environment')
@@ -14,7 +35,7 @@ const createPrismaClient = () => {
         log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['warn', 'error'],
       })
       
-      // Test the connection
+      // Test the connection asynchronously
       client.$connect()
         .then(() => {
           console.log('✅ Prisma client connected successfully')
@@ -38,11 +59,6 @@ const createPrismaClient = () => {
       log: ['query'],
     })
   }
-}
-
-// Global singleton to prevent multiple instances
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
 }
 
 export const db = globalForPrisma.prisma ?? createPrismaClient()
