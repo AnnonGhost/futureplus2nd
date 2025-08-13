@@ -18,13 +18,6 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": ".next",
   "installCommand": "npm install && npm run postinstall",
-  "functions": {
-    "app/**/*.{js,ts,tsx}": {
-      "maxDuration": 30
-    },
-    "pages/api/**/*.{js,ts}": {
-      "maxDuration": 30
-    }
-  },
+  
   "crons": []
 }
